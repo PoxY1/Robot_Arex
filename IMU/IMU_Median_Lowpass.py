@@ -36,12 +36,29 @@ freq = 400
 Ts = 1/freq
 
 displayPeriod = 0.1
+medSize = 11
+
 
 timeStart = round(time.time(),3)
 timeNow = round(time.time(),1) #Do nadawania czestotliwosci wyswietlania odczytow z IMU
 
 accelerationPlotValue = [0.0]
 accelerationTimestamp = [0.0]
+accelerationFiltered = [0.0]*3
+predkosc = [0.0]*3
+polozenie = [0.0]*3
+
+accelerationFilterWindow = np.zeros((medSize,3),dtype=float)
+
+#accelerationFilterWindow = [[0.0]*3]*11
+#accelerationFilterWindow = np.append(accelerationFilterWindow,[[1.0,2.0,3.0]],0)
+#accelerationFilterWindow = np.delete(accelerationFilterWindow,1,0)
+
+
+#print(accelerationFilterWindow)
+#print(accelerationFilterWindow)
+#print("Okrojona wartosc",accelerationFilterWindow[:,0])
+
 with dai.Pipeline() as pipeline:
     imu = pipeline.create(dai.node.IMU)
 
@@ -75,7 +92,7 @@ with dai.Pipeline() as pipeline:
             imuF = "{:.06f}"
             tsF  = "{:.03f}"
 
-            acceleration_vector = [acceleroValues.x, acceleroValues.y, acceleroValues.z]
+
             #print(acceleration_vector)
             #print()
             #print()
@@ -85,6 +102,38 @@ with dai.Pipeline() as pipeline:
                 pipeline.stop()
                 break
 
+        acceleration_vector = [acceleroValues.x, acceleroValues.y, acceleroValues.z]
+
+        accelerationFilterWindow = np.append(accelerationFilterWindow, [acceleration_vector], 0)
+        accelerationFilterWindow = np.delete(accelerationFilterWindow, 0, 0)
+
+        # accelerationFiltered[0] = ss.medfilt(accelerationFilterWindow[:,0], kernel_size=medSize)
+        # accelerationFiltered[1] = ss.medfilt(accelerationFilterWindow[:,1], kernel_size=medSize)
+        # accelerationFiltered[2] = ss.medfilt(accelerationFilterWindow[:,2], kernel_size=medSize)
+
+        accelerationFiltered[0] = sum(accelerationFilterWindow[:,0])/medSize
+        accelerationFiltered[1] = sum(accelerationFilterWindow[:,1])/medSize
+        accelerationFiltered[2] = sum(accelerationFilterWindow[:,2])/medSize
+        #print("Okno:",accelerationFilterWindow[:,0])
+        #print("Przefiltrowane:",accelerationFiltered[0])
+
+        # predkosc[0] += round(float(imuF.format(acceleroValues.x)) * Ts, 3)
+        # predkosc[1] += round(float(imuF.format(acceleroValues.y)) * Ts, 3)
+        # predkosc[2] += round(float(imuF.format(acceleroValues.z)) * Ts, 3)
+        predkosc[0] += accelerationFiltered[0] * Ts
+        predkosc[1] += accelerationFiltered[1] * Ts
+        predkosc[2] += accelerationFiltered[2] * Ts
+
+
+        #print(f"Predkosc X: {predkosc_x} Y: {predkosc_y} Z: {predkosc_z}")
+
+        # Polozenie blednie obliczane - znalezc przyczyne nieodpowiedniego przeskalowania
+        polozenie[0] += predkosc[0] * Ts
+        polozenie[1] += predkosc[1] * Ts
+        polozenie[2] += predkosc[2] * Ts
+        #print(f"Polozenie X: {polozenie_x} Y: {polozenie_y} Z: {polozenie_z}")
+
+
         accelerationPlotValue.append(acceleration_vector[0])
         accelerationTimestamp.append(round(time.time(),3) - timeStart)
 
@@ -92,7 +141,14 @@ with dai.Pipeline() as pipeline:
             timeNow = round(time.time(), 1)
 
             okno_danych = np.zeros((300, 800, 3), dtype="uint8")
-            windowPutText(okno_danych, 30,20,"Akcelerometr:",acceleration_vector[0],acceleration_vector[1],acceleration_vector[2])
+
+            #windowPutText(okno_danych, 30,20,"Akcelerometr:",acceleration_vector[0],acceleration_vector[1],acceleration_vector[2])
+            windowPutText(okno_danych, 30, 20, "Akcelerometr:", accelerationFiltered[0], accelerationFiltered[1], accelerationFiltered[2])
+
+            windowPutText(okno_danych, 30, 120, "Predkosc:", predkosc[0], predkosc[1], predkosc[2])
+
+            windowPutText(okno_danych, 30, 220, "Polozenie:", polozenie[0], polozenie[1], polozenie[2])
+
             cv2.imshow("IMU Data", okno_danych)
 
     accelerationTimestamp.pop(0)
@@ -138,7 +194,7 @@ with dai.Pipeline() as pipeline:
     plt.xticks(freq_ticks_indices, freq_ticks)
     plt.show()
 
-    filteredSignal = ss.medfilt(accelerationPlotValue, kernel_size=11)
+    filteredSignal = ss.medfilt(accelerationPlotValue, kernel_size=medSize)
 
     plt.figure(figsize=(8, 24))
     plt.subplot(311)
@@ -155,4 +211,6 @@ with dai.Pipeline() as pipeline:
 
 
     plt.show()
+    plt.show()
 
+np.savetxt("foo.csv", accelerationFilterWindow, delimiter=",") # Eksport do pliku
