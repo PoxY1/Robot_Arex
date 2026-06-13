@@ -36,7 +36,7 @@ Ts = 1/freq
 displayPeriod = 0.1
 medSize = 11
 
-loaded_cal_info = load_calibration_info('IMU/imu1/Ferraris/imu1_2020-08-12_13-21.json')
+loaded_cal_info = load_calibration_info('imu1/Ferraris/imu1_2020-08-12_13-21.json')
 
 
 

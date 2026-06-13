@@ -26,6 +26,8 @@ monoRightOut = configure_cam(monoRight, 640, 400, 60)
 
 
 
+
+
 # Linking
 #monoLeftOut = monoLeft.requestFullResolutionOutput()
 #monoRightOut = monoRight.requestFullResolutionOutput()
